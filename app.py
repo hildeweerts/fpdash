@@ -306,7 +306,8 @@ def scatter_neighbors(x, y, neighbors, meta_base):
     config={'displayModeBar': False,
             'showLink' : False}
     
-    return dcc.Graph(figure = {'data' : traces,
+    return dcc.Graph(id='neighbors-scatter',
+                     figure = {'data' : traces,
                                'layout' : layout},
                      config = config,
                      #style = {'height' : '18px',
@@ -315,13 +316,13 @@ def scatter_neighbors(x, y, neighbors, meta_base):
 
 def update_performance(fig, border_width=4):
     global spectral
+    print(fig['data'][0]['marker']['line']['width'])
     if fig['data'][0]['marker']['line']['width'] == 0:
         fig['data'][5]['marker']['showscale'] = False
         for i in range(4):
             fig['data'][i]['marker']['line']['width'] = border_width
             fig['data'][i]['marker']['colorscale'] = [[0,'rgba(75, 75, 75, 1)'], [1, 'rgba(75, 75, 75, 1)']]
             fig['data'][i]['showlegend'] = True
-            
     else:
         fig['data'][5]['marker']['showscale'] = True
         for i in range(4):
@@ -373,6 +374,7 @@ APPLICATION
 
 external_stylesheets = [os.getcwd() + '/assets/font-awesome/css/all.css']
 app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
+app.config.supress_callback_exceptions = True
 
 app.layout = html.Div([
         html.Div([
@@ -476,17 +478,13 @@ app.layout = html.Div([
                                                           marks={str(n): {'label' : str(n), 
                                                                           'style' : {'font-size' : 10}} for n in range(0,110,10)})])
                                           ]),
-                                 html.Div(className = 'row', 
-                                          children = [
-                                              html.Button('Retrieve', id='retrieve-button', style = {'marginTop' : '2.5rem'})
-                                           ]),
                                  html.Div(className ='row',
                                           children = [
-                                              html.Div(id='load-neighbors'),
                                               html.Div(id='neighbors-plot')
                                           ]),
-                                 html.Div(className = 'row', 
-                                          children = [html.Button('Performance', 
+                                 html.Div(className = 'row',
+                                          id='view-div',
+                                          children = [html.Button('View Performance', 
                                                                   id='perf-button',
                                                                   style = {'marginTop' : '2.5rem'})]),
                                  
@@ -580,28 +578,37 @@ def update_importances(n_clicks, instance, nr_samples):
 """
 RETRIEVE NEIGHBORS
 """
-@app.callback(Output('load-neighbors', 'children'),
-              [Input('retrieve-button', 'n_clicks'),
-               Input('selected-instance', 'children')])
-def update_importances(n_clicks, children):
-    if (n_clicks or children):
-        return html.Div([html.P('Loading...')], 
-                        id='neighbors-plot',
-                        style = {'marginTop' : '10px'})
-    
+
 @app.callback(
     Output('neighbors-plot', 'children'),
-    [Input('retrieve-button', 'n_clicks'), 
-     Input('selected-instance', 'children')],
-    [State('neighbors-slider', 'value')])
-def update_importances(n_clicks, instance, n_neighbors):
+    [Input('neighbors-slider', 'value'), 
+     Input('selected-instance', 'children')])
+def update_neighbors(n_neighbors, instance):
     global meta_base
-    if (n_clicks or instance):
-        space = 'feature'
-        distances, neighbors = retrieve_neighbors(instance, n_neighbors)
-        x, y = compute_mds(instance, neighbors, space=space)
-        fig = scatter_neighbors(x, y, neighbors, meta_base)
-        return fig
-    
+    space = 'feature'
+    distances, neighbors = retrieve_neighbors(instance, n_neighbors)
+    x, y = compute_mds(instance, neighbors, space=space)
+    graph = scatter_neighbors(x, y, neighbors, meta_base)
+    return graph
+
+@app.callback(
+    Output('neighbors-scatter', 'figure'),
+    [Input('perf-button', 'n_clicks')],
+    [State('neighbors-scatter', 'figure')])
+def update_scatter(n_clicks, figure):
+    return update_performance(figure)
+
+
+@app.callback(
+    Output('perf-button', 'children'),
+    [Input('perf-button', 'n_clicks')])
+def update_perf_button(n_clicks):
+    if (n_clicks % 2 is None):
+        children = 'View Performance'
+    else:
+        children = 'View Predictions'
+    return children
+
 if __name__ == '__main__':
     app.run_server(debug=True, processes=4)
+    
