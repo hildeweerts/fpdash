@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns; sns.set()
 
 
-def openmlwrapper(data_id=31, random_state=1, n_samples = 2000, verbose=True, scale=True):
+def openmlwrapper(data_id=31, random_state=1, n_samples = 2000, verbose=True, scale=True, test_size=0.25):
     """
     Wrapper for preprocessing OpenML datasets. Train/test split (75/25) and fill missing values with median of
     training set. 
@@ -49,7 +49,8 @@ def openmlwrapper(data_id=31, random_state=1, n_samples = 2000, verbose=True, sc
     # Split data in train and test
     X_train, X_test, y_train, y_test = train_test_split(pd.DataFrame(X, columns=att),
                                                         pd.DataFrame(y, columns=['class']),
-                                                        random_state = random_state)
+                                                        random_state = random_state,
+                                                        test_size=test_size)
     # Fill missing values with median of X_train
     X_train = X_train.fillna(X_train.median())
     X_test = X_test.fillna(X_train.median())

@@ -70,19 +70,7 @@ PLOT/DISPLAY FUNCTIONS
 """
 
 def generate_options():
-    return [{'label' : 'Instance %s' % nr, 'value' : nr} for nr in range(1,11)]
-
-def prototype_table(dataframe, max_rows=10):
-    return html.Table(
-        # Header
-        [html.Tr([html.Th(col) for col in dataframe.columns])] +
-        # Body
-        [html.Tr([
-            html.Td(dataframe.iloc[i][col]) for col in dataframe.columns
-        ]) for i in range(min(len(dataframe), max_rows))],
-        style={'font-size': '1.3rem',
-               'margin' : '0 auto'}
-    )
+    return [{'label' : 'Case %s' % nr, 'value' : nr} for nr in range(1,11)]
 
 def feature_importance_bar(shap_value, error, lim):
     if shap_value >= 0:
@@ -142,7 +130,7 @@ def feature_importance_bar(shap_value, error, lim):
 
 def feature_importance_table(importances, features, values, errors):
     # Add header
-    table = [html.Tr([html.Th(col) for col in ['Importance', 'Feature', 'Value']])]
+    table = [html.Tr([html.Th(col) for col in ['Contribution', 'Feature', 'Value']])]
     # Add body
     lim = np.abs(importances[0]) + 0.2
     for importance, feature, value, error in zip(importances, features, values, errors):
@@ -203,7 +191,7 @@ app = dash.Dash(__name__, external_stylesheets=external_stylesheets)
 app.layout = html.Div([
         html.Div([
             # LEFT COLUMN: ALERT SELECTION
-            html.Div([html.H1('Instances'),
+            html.Div([html.H1('Alerts'),
                       dcc.RadioItems(
                           id='alertlist',
                           inputStyle = radioStyle,
@@ -218,7 +206,7 @@ app.layout = html.Div([
             html.Div(
                 children = [
                     # Title
-                    html.H1('Alert ID', id='alert_id'),
+                    html.H1('Case ID', id='alert_id'),
                     # Prediction Probability Row
                     html.Div(className = 'row', 
                              children = [
@@ -237,7 +225,18 @@ app.layout = html.Div([
                                  # Title
                                  html.H2('Explanation'),
                                  # Paragraph
-                                 html.P('Feature values and their approximated importances are displayed, sorted on absolute importance.'),
+                                 html.P("""The displayed feature contributions indicate how much each feature value contributed to the
+                                           algorithm's prediction."""),
+                                 html.Ul([
+                                     html.Li(html.P([
+                                         html.B('Negative contribution: '), 
+                                         'feature value makes it ', html.B('less'), ' likely that the case is fraudulent.']
+                                     )),
+                                     html.Li(html.P([
+                                         html.B('Positive contribution: '), 
+                                         'feature value makes it ', html.B('more'), ' likely that the case is fraudulent.']
+                                     ))
+                                 ]),
                                  # Slider
                                  html.H3(['Number of Samples ',
                                           html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
@@ -263,27 +262,23 @@ app.layout = html.Div([
                     html.Div(id='load-importances'),
                     html.Div(id='feature-importance-table')
                 ],
-                className="seven columns",
+                className="six columns",
                 id = 'explanation',
                 style = middleColumnStyle),
             
             # RIGHT COLUMN: PROTOTYPE
-            html.Div(className="three columns",
+            html.Div(className="four columns",
                      style = columnStyle,
-                     children = [html.H1('Cluster Information'),
-                                 html.H3('Prototype'),
-                                 html.P('This instance is similar to a group of instances with the following properties.'),
-                                 html.Div(prototype_table(df), 
-                                          style={'padding-bottom' : 30,
-                                                 'margin-left' : 0},
-                                          className = 'column'),
+                     children = [html.H1('Case-Based Performance'),
+                                 html.H3('Similar Cases'),
+                                 html.P('.'),
                                  html.H3('Local Performance'),
                                  html.H5("""Local accuracy is the proportion of similar instances classified 
                                  correctly by the algorithm."""),
-                                 html.H4(['Local Accuracy: 0.73 \u00B1 0.1 ']),
+                                 html.H4(['Local Accuracy: 0.73']),
                                  html.H5("""Local precision is the proportion of similar instances classified as 
                                  positive by the classifier that were truly positive."""),
-                                 html.H4(['Local Precision: 0.73 \u00B1 0.1 '])
+                                 html.H4(['Local Precision: 0.73'])
                                 ]),
             # HIDDEN DIVS WITH INTERMEDIATE VALUES
             html.Div(id='selected-instance', style={'display': 'none'}, children=0),
@@ -310,7 +305,7 @@ def select_instance(value):
 @app.callback(Output('alert_id', 'children'),
               [Input('alertlist', 'value')])
 def update_title(value):
-    title = 'Instance ID: %s' % value
+    title = 'Case ID: %s' % value
     return title
 
 """
