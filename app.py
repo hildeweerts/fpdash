@@ -102,7 +102,10 @@ def compute_shap(instance, nr_samples, top):
 COMPUTATIONS FOR NEIGHBOR PLOT
 """
 def retrieve_neighbors(i, n_neighbors = 10):
-    distances, neighbors = nn.kneighbors(SHAP_alert.iloc[[i]], n_neighbors=n_neighbors)
+    if n_neighbors == 0:
+        distances, neighbors = [None], [None]
+    else:
+        distances, neighbors = nn.kneighbors(SHAP_alert.iloc[[i]], n_neighbors=n_neighbors)
     return distances[0], neighbors[0]
 
 def compute_mds(i, neighbors, space):
@@ -217,9 +220,28 @@ def feature_importance_table(importances, features, values, errors):
 """
 Neighbors plot
 """
-def scatter_neighbors(x, y, neighbors, meta_base):
+def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
+    """
+    Parameters
+    ----------
+        view : str, one from ['perf', 'pred']
+    """
     global spectral
     global cat_colors
+    global meta_base
+    global meta_alert
+    
+    if view == 'pred':
+        showscale = False
+        colorscale = [[0,'rgba(75, 75, 75, 1)'], [1, 'rgba(75, 75, 75, 1)']]
+        showlegend = True
+    elif view == 'perf':
+        border_width = 0
+        showscale = True
+        colorscale = spectral
+        showlegend = False
+    else:
+        raise ValueError("view must be one of ['pred', 'perf']")
     
     """
     PREP
@@ -240,13 +262,13 @@ def scatter_neighbors(x, y, neighbors, meta_base):
             x = group['x'],
             y = group['y'],
             mode = 'markers',
-            marker = {'line' : {'width' : 0, 'color' : cat_colors[perf]},
+            marker = {'line' : {'width' : border_width, 'color' : cat_colors[perf]},
                       'color' : group['score'],
-                      'colorscale' : spectral,
+                      'colorscale' : colorscale,
                       'cmin' : 0,
                       'cmax' : 1,
-                      'size' : 11},
-            showlegend = False,
+                      'size' : 10},
+            showlegend = showlegend,
             name=perf,
             hoverinfo = 'text',
             hoveron = 'points',
@@ -262,9 +284,9 @@ def scatter_neighbors(x, y, neighbors, meta_base):
                   'color' : 'rgba(255, 255, 0, 0.3)'},
         name = 'Current alert',
         showlegend = True,
-        hoverinfo = 'name',
+        hoverinfo = 'text',
         hoveron = 'points',
-        text = 'Current alert'))
+        text = 'Current Alert (p=%.2f)' % meta_alert['score'].iloc[instance]))
     # Add dummy colorbar
     traces.append(go.Scatter(
         x=[None],
@@ -272,10 +294,10 @@ def scatter_neighbors(x, y, neighbors, meta_base):
         mode='markers',
         marker=dict(
             colorscale=spectral, 
-            showscale=True,
+            showscale=showscale,
             cmin=0,
             cmax=1,
-            colorbar=dict(thickness=5, outlinewidth=0, title="""Prediction""")),
+            colorbar=dict(thickness=5, ticklen=8, outlinewidth=0, title="""Prediction""", tickfont = {'size' : 8}, titlefont={'size' : 10})),
         showlegend = False,
         hoverinfo='none'))
 
@@ -297,7 +319,7 @@ def scatter_neighbors(x, y, neighbors, meta_base):
     margin = go.layout.Margin(l=0, r=0, t=0, b=0, pad=0)
     layout = go.Layout(yaxis = yaxis, xaxis = xaxis, margin = margin, height = 300,
                        hovermode = 'closest', legend = dict(y=-0.05, orientation='h'),
-                       paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+                       paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)',title='Hoi')
     
     """
     Define config
@@ -314,16 +336,16 @@ def scatter_neighbors(x, y, neighbors, meta_base):
                      #  'width' : '170px'}
                     )
 
-def update_performance(fig, border_width=4):
+def update_performance(fig, view, border_width=4):
     global spectral
-    print(fig['data'][0]['marker']['line']['width'])
-    if fig['data'][0]['marker']['line']['width'] == 0:
+    current_width = fig['data'][0]['marker']['line']['width']   
+    if ((current_width == 0) and (view == 'perf')):
         fig['data'][5]['marker']['showscale'] = False
         for i in range(4):
             fig['data'][i]['marker']['line']['width'] = border_width
             fig['data'][i]['marker']['colorscale'] = [[0,'rgba(75, 75, 75, 1)'], [1, 'rgba(75, 75, 75, 1)']]
             fig['data'][i]['showlegend'] = True
-    else:
+    elif ((current_width != 0) and (view == 'pred')):
         fig['data'][5]['marker']['showscale'] = True
         for i in range(4):
             fig['data'][i]['marker']['line']['width'] = 0
@@ -462,6 +484,24 @@ app.layout = html.Div([
                      style = columnStyle,
                      children = [html.H1('Case-Based Performance'),
                                  html.H2('Most Similar Cases'),
+                                 html.P('Cases are retrieved based on how similar their explanation is to the current alert.'),
+                                html.Div(className = 'row',
+                                          children = [
+                                              html.H4(['Local Accuracy ', 
+                                                       html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
+                                                                 html.Span("""Local accuracy is the proportion of similar instances classified 
+                                                         correctly by the algorithm.""",
+                                                                           className='tooltiptext')], 
+                                                                className = "tooltip")
+                                                      ], id='accuracy'),
+                                              html.H4(['Local Precision ', 
+                                                       html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
+                                                                 html.Span("""Local precision is the proportion of similar instances classified as 
+                                                         positive by the classifier that were truly positive.""",
+                                                                           className='tooltiptext')], 
+                                                                className = "tooltip")
+                                                      ], id='precision')
+                                          ]),
                                  html.Div(className='row',
                                           children = [
                                               html.H3('Number of Cases'),
@@ -471,36 +511,31 @@ app.layout = html.Div([
                                               html.Div(className="eleven columns",
                                                       children = [dcc.Slider(
                                                           id='neighbors-slider',
-                                                          min=0,
+                                                          min=10,
                                                           max=100,
                                                           step=5,
                                                           value=20,                            
                                                           marks={str(n): {'label' : str(n), 
-                                                                          'style' : {'font-size' : 10}} for n in range(0,110,10)})])
-                                          ]),
-                                 html.Div(className ='row',
-                                          children = [
-                                              html.Div(id='neighbors-plot')
+                                                                          'style' : {'font-size' : 10}} for n in range(10,110,10)})])
                                           ]),
                                  html.Div(className = 'row',
                                           id='view-div',
                                           children = [html.Button('View Performance', 
                                                                   id='perf-button',
-                                                                  style = {'marginTop' : '2.5rem'})]),
-                                 
-                                 html.Div(className = 'row',
+                                                                  style = {'marginTop' : '2.5rem',
+                                                                           'marginRight' : '0.5rem'}),
+                                                      html.Button('View in Explanation Space',
+                                                                  id='space-button',
+                                                                  style = {'marginTop' : '2.5rem'})]
+                                         ),
+                                 html.Div(className ='row',
                                           children = [
-                                              html.H2('Local Performance'),
-                                              html.H5("""Local accuracy is the proportion of similar instances classified 
-                                                         correctly by the algorithm."""),
-                                              html.H4(['Local Accuracy: 0.73']),
-                                              html.H5("""Local precision is the proportion of similar instances classified as 
-                                                         positive by the classifier that were truly positive."""),
-                                              html.H4(['Local Precision: 0.73'])
+                                              html.Div(id='neighbors-plot', style= {'marginTop' : '1.5rem', 'marginBottom' : '1.5rem'})
                                           ])
                                 ]),
             # HIDDEN DIVS WITH INTERMEDIATE VALUES
             html.Div(id='selected-instance', style={'display': 'none'}, children=0),
+            html.Div(id='neighbor-dummydiv', style={'display': 'none'}, children=None)
                       ])
 ], style={'paddingTop' : 5})
 
@@ -579,16 +614,39 @@ def update_importances(n_clicks, instance, nr_samples):
 RETRIEVE NEIGHBORS
 """
 
+"""
+save neighbors
+"""
+@app.callback(
+    Output('neighbor-dummydiv', 'children'),
+    [Input('neighbors-slider', 'value'),
+     Input('selected-instance', 'children')])
+def update_dummy_div(n_neighbors, instance):
+    global meta_base
+    distances, neighbors = retrieve_neighbors(instance, n_neighbors)
+    return neighbors
+
+"""
+scatterplot
+"""
 @app.callback(
     Output('neighbors-plot', 'children'),
-    [Input('neighbors-slider', 'value'), 
-     Input('selected-instance', 'children')])
-def update_neighbors(n_neighbors, instance):
+    [Input('neighbor-dummydiv', 'children'),
+     Input('selected-instance', 'children'),
+     Input('space-button', 'n_clicks')],
+    [State('perf-button', 'n_clicks')])
+def update_neighbors(neighbors, instance, n_clicks_space, n_clicks_perf):
     global meta_base
-    space = 'feature'
-    distances, neighbors = retrieve_neighbors(instance, n_neighbors)
+    if (n_clicks_space is None) or (n_clicks_space % 2 ==0):
+        space = 'feature'
+    else:
+        space = 'shap'
+    # compute graph
     x, y = compute_mds(instance, neighbors, space=space)
-    graph = scatter_neighbors(x, y, neighbors, meta_base)
+    if (n_clicks_perf is None) or (n_clicks_perf % 2 == 0):
+        graph = scatter_neighbors(x, y, neighbors, view='perf', instance=instance)
+    else:
+        graph = scatter_neighbors(x, y, neighbors, view='pred', instance=instance)
     return graph
 
 @app.callback(
@@ -596,17 +654,62 @@ def update_neighbors(n_neighbors, instance):
     [Input('perf-button', 'n_clicks')],
     [State('neighbors-scatter', 'figure')])
 def update_scatter(n_clicks, figure):
-    return update_performance(figure)
+    if (n_clicks is None) or (n_clicks % 2 == 0):
+        figure = update_performance(figure, view='pred')
+    else:
+        figure = update_performance(figure, view='perf')
+    return figure
 
-
+"""
+update buttons
+"""
 @app.callback(
     Output('perf-button', 'children'),
     [Input('perf-button', 'n_clicks')])
 def update_perf_button(n_clicks):
-    if (n_clicks % 2 is None):
+    if (n_clicks is None) or (n_clicks % 2 == 0):
         children = 'View Performance'
     else:
         children = 'View Predictions'
+    return children
+
+@app.callback(
+    Output('space-button', 'children'),
+    [Input('space-button', 'n_clicks')])
+def update_space_button(n_clicks):
+    if (n_clicks is None) or (n_clicks % 2 == 0):
+        children = 'View in explanation space'
+    else:
+        children = 'View in feature space'
+    return children
+
+"""
+update performance measures
+"""
+@app.callback(
+    Output('accuracy', 'children'),
+    [Input('neighbor-dummydiv', 'children')],
+    [State('accuracy', 'children')])
+def update_accuracy(neighbors, children):
+    meta_neighbors = meta_base.iloc[neighbors]
+    acc = meta_neighbors['performance'].map({'TP' : 1, 'TN' : 1, 'FP' : 0, 'FN' : 0}).mean()
+    children[0] = 'Local Accuracy: %.2f ' % acc
+    return children
+
+@app.callback(
+    Output('precision', 'children'),
+    [Input('neighbor-dummydiv', 'children')],
+    [State('precision', 'children')])
+def update_accuracy(neighbors, children):
+    meta_neighbors = meta_base.iloc[neighbors]
+    tp = len(meta_neighbors[meta_neighbors['performance'] == 'TP'])
+    fp = len(meta_neighbors[meta_neighbors['performance'] == 'FP'])
+    if (tp + fp) == 0:
+        text = 'Local Precision: NA '
+    else:
+        pre = tp/(tp + fp)
+        text = 'Local Precision: %.2f ' % pre
+    children[0] = text
     return children
 
 if __name__ == '__main__':
