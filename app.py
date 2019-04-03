@@ -74,28 +74,42 @@ cat_colors = {'TP' : 'rgba(159, 211, 86, %s)' % opacity,
 COMPUTE SHAP WITH SAMPLES
 """
 
-# SHAP VALUES
-def compute_shap(instance, nr_samples, top):
-    # Compute SHAP values
-    shap_values = explainer.standard(X_alert.iloc[instance], m = nr_samples, return_samples=True)
+# # SHAP VALUES
+# def compute_shap(instance, nr_samples, top):
+#     # Compute SHAP values
+#     shap_values = explainer.standard(X_alert.iloc[instance], m = nr_samples, return_samples=True)
+#     # Retrieve most important features
+#     df = pd.DataFrame.from_dict(shap_values.shap_values, orient = 'index').reset_index(level=0)
+#     df = df.reindex(df[0].abs().sort_values(ascending = False).index)
+#     features = list(df['index'].iloc[0:top])
+#     importances = list(df[0].iloc[0:top])
+#     # Retrieve feature value
+#     values = [X_alert_decoded.iloc[instance][f] for f in features]
+#     # Retrieve errors
+#     errors = []
+#     alpha = 0.05
+#     for f in features: 
+#         index = list(X_base).index(f)
+#         samples = shap_values.samples[index]
+#         n = len(samples)
+#         t = stats.t.ppf(1-alpha/2, n)
+#         s = samples['c'].std()
+#         errors.append(t*s/np.sqrt(n))
+#     return importances, features, values, errors
+
+def retrieve_shap(instance, top):
+    # Retrieve SHAP values    
+    shap_values = SHAP_alert.iloc[instance].to_dict()
     # Retrieve most important features
-    df = pd.DataFrame.from_dict(shap_values.shap_values, orient = 'index').reset_index(level=0)
+    df = pd.DataFrame.from_dict(shap_values, orient = 'index').reset_index(level=0)
     df = df.reindex(df[0].abs().sort_values(ascending = False).index)
     features = list(df['index'].iloc[0:top])
     importances = list(df[0].iloc[0:top])
     # Retrieve feature value
     values = [X_alert_decoded.iloc[instance][f] for f in features]
     # Retrieve errors
-    errors = []
     alpha = 0.05
-    for f in features: 
-        index = list(X_base).index(f)
-        samples = shap_values.samples[index]
-        n = len(samples)
-        t = stats.t.ppf(1-alpha/2, n)
-        s = samples['c'].std()
-        errors.append(t*s/np.sqrt(n))
-    return importances, features, values, errors
+    return importances, features, values
 
 
 """
@@ -144,7 +158,79 @@ Feature importances
 def generate_options():
     return [{'label' : 'Case %s' % nr, 'value' : nr} for nr in range(1,11)]
 
-def feature_importance_bar(shap_value, error, lim):
+# def feature_importance_bar(shap_value, error, lim):
+#     if shap_value >= 0:
+#         color = '#0DB5E6'
+#     else:
+#         color = '#ffa54c'
+#     # Trace definition
+#     hoverlabel = {
+#         'bordercolor' : 'white',
+#         'font' : {'size' : 10},
+#     }
+#     trace = go.Bar(x = [shap_value] , 
+#                y = [''],
+#                orientation = 'h',
+#                hoverinfo = 'x',
+#                hoverlabel = hoverlabel,
+#                marker = {'color' : color},
+#                error_x= {'type' : 'data', 
+#                          'array' : [error],
+#                          'visible' : True,
+#                          'thickness': 1,
+#                          'width' : 2, 
+#                          'color' : '#727272'}
+#     )
+#     # Layout definition
+#     xaxis = {
+#         'range' : [-lim, lim],
+#         'fixedrange' : True,
+#         'showgrid' : False,
+#         'zeroline' : False,
+#         'showline' : False,
+#         'showticklabels' : False,
+#         'hoverformat': '.2f'
+#     }
+#     yaxis = {
+#         'fixedrange' : True,
+#         'showgrid' : False,
+#         'zeroline' : False,
+#         'showline' : False,
+#         'showticklabels' : False
+#     }
+#     margin=go.layout.Margin(l=0, r=0, t=0, b=0, pad=0)
+#     layout = go.Layout(yaxis = yaxis,
+#                        xaxis = xaxis,
+#                        margin = margin,
+#                        bargap = 0)
+    
+#     # Config definition
+#     config={'displayModeBar': False,
+#             'showLink' : False}
+    
+#     return dcc.Graph(figure = {'data' : [trace],
+#                                'layout' : layout}, 
+#                      config = config,
+#                      style = {'height' : '18px',
+#                               'width' : '170px'})
+# def feature_importance_table(importances, features, values, errors):
+#     # Add header
+#     table = [html.Tr([html.Th(col) for col in ['Contribution', 'Feature', 'Value']])]
+#     # Add body
+#     lim = np.abs(importances[0]) + 0.2
+#     for importance, feature, value, error in zip(importances, features, values, errors):
+#         table.append(html.Tr([
+#             html.Td(feature_importance_bar(importance, error, lim)),
+#             html.Td(feature),
+#             html.Td(value),
+#         ]))
+        
+#     return html.Table(table,
+#                       style={'font-size': '1.5rem',
+#                              'marginTop' : '10px'}
+#                      )
+
+def feature_importance_bar_exact(shap_value, lim):
     if shap_value >= 0:
         color = '#0DB5E6'
     else:
@@ -160,12 +246,6 @@ def feature_importance_bar(shap_value, error, lim):
                hoverinfo = 'x',
                hoverlabel = hoverlabel,
                marker = {'color' : color},
-               error_x= {'type' : 'data', 
-                         'array' : [error],
-                         'visible' : True,
-                         'thickness': 1,
-                         'width' : 2, 
-                         'color' : '#727272'}
     )
     # Layout definition
     xaxis = {
@@ -200,14 +280,14 @@ def feature_importance_bar(shap_value, error, lim):
                      style = {'height' : '18px',
                               'width' : '170px'})
 
-def feature_importance_table(importances, features, values, errors):
+def feature_importance_table_exact(importances, features, values):
     # Add header
     table = [html.Tr([html.Th(col) for col in ['Contribution', 'Feature', 'Value']])]
     # Add body
     lim = np.abs(importances[0]) + 0.2
-    for importance, feature, value, error in zip(importances, features, values, errors):
+    for importance, feature, value in zip(importances, features, values):
         table.append(html.Tr([
-            html.Td(feature_importance_bar(importance, error, lim)),
+            html.Td(feature_importance_bar_exact(importance, lim)),
             html.Td(feature),
             html.Td(value),
         ]))
@@ -446,32 +526,35 @@ app.layout = html.Div([
                                          html.B('Positive contribution: '), 
                                          'feature value makes it ', html.B('more'), ' likely that the case is fraudulent.']
                                      ))
-                                 ]),
-                                 html.H3(['Number of Samples ',
-                                          html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
-                                                    html.Span( """Increasing the number of samples per feature results in
-                                                                   more accurate approximations but increases the 
-                                                                   computation time.""",
-                                                               className='tooltiptext')], 
-                                                    className = "tooltip")])
+                                 ])
                              ]),
-                    # Slider
-                    html.Div(className='row',
-                             children=[
-                                 html.Div(className="nine columns",
-                                          children = [dcc.Slider(
-                                              id='samples-slider',
-                                              min=0,
-                                              max=1000,
-                                              step=50,
-                                              value=100,                            
-                                              marks={str(n): {'label' : str(n), 
-                                                              'style' : {'font-size' : 10}} for n in range(0,1100,100)})])
-                                      ]),
-                    html.Div(className = 'row', 
-                             children = [html.Button('Compute', 
-                                                     id='compute-button',
-                                                     style = {'marginTop' : '2.5rem'})]),
+#                     html.Div(className='row', 
+#                              children = [
+#                                  html.H3(['Number of Samples ',
+#                                           html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
+#                                                     html.Span( """Increasing the number of samples per feature results in
+#                                                                    more accurate approximations but increases the 
+#                                                                    computation time.""",
+#                                                                className='tooltiptext')], 
+#                                                     className = "tooltip")])
+#                              ]),
+#                     # Slider
+#                     html.Div(className='row',
+#                              children=[
+#                                  html.Div(className="nine columns",
+#                                           children = [dcc.Slider(
+#                                               id='samples-slider',
+#                                               min=0,
+#                                               max=1000,
+#                                               step=50,
+#                                               value=100,                            
+#                                               marks={str(n): {'label' : str(n), 
+#                                                               'style' : {'font-size' : 10}} for n in range(0,1100,100)})])
+#                                       ]),
+#                     html.Div(className = 'row', 
+#                              children = [html.Button('Compute', 
+#                                                      id='compute-button',
+#                                                      style = {'marginTop' : '2.5rem'})]),
                     html.Div(id='load-importances'),
                     html.Div(id='feature-importance-table')
                 ],
@@ -504,7 +587,7 @@ app.layout = html.Div([
                                           ]),
                                  html.Div(className='row',
                                           children = [
-                                              html.H3('Number of Cases'),
+                                              html.H6('Number of Cases'),
                                           ]),
                                  html.Div(className = 'row', 
                                           children = [
@@ -559,6 +642,7 @@ def select_instance(value):
 @app.callback(Output('alert_id', 'children'),
               [Input('alertlist', 'value')])
 def update_title(value):
+    global X_alert
     title = 'Case ID: %s' % value
     return title
 
@@ -590,25 +674,34 @@ def update_probability(instance):
 COMPUTE SHAP VALUE
 """
 
-@app.callback(Output('load-importances', 'children'),
-              [Input('compute-button', 'n_clicks'),
-               Input('selected-instance', 'children')])
-def update_importances(n_clicks, children):
-    if (n_clicks or children):
-        return html.Div([html.P('Loading...')], 
-                        id='feature-importance-table',
-                        style = {'marginTop' : '10px'})
+# @app.callback(Output('load-importances', 'children'),
+#               [Input('compute-button', 'n_clicks'),
+#                Input('selected-instance', 'children')])
+# def update_importances(n_clicks, children):
+#     if (n_clicks or children):
+#         return html.Div([html.P('Loading...')], 
+#                         id='feature-importance-table',
+#                         style = {'marginTop' : '10px'})
+# @app.callback(
+#     Output('feature-importance-table', 'children'),
+#     [Input('compute-button', 'n_clicks'), 
+#      Input('selected-instance', 'children')],
+#     [State('samples-slider', 'value')])
+# def update_importances(n_clicks, instance, nr_samples):
+#     if (n_clicks or instance):
+#         top = 10
+#         importances, features, values, errors = compute_shap(int(instance), nr_samples, top)
+#         return feature_importance_table(importances, features, values, errors)
 
 @app.callback(
     Output('feature-importance-table', 'children'),
-    [Input('compute-button', 'n_clicks'), 
-     Input('selected-instance', 'children')],
-    [State('samples-slider', 'value')])
-def update_importances(n_clicks, instance, nr_samples):
-    if (n_clicks or instance):
-        top = 10
-        importances, features, values, errors = compute_shap(int(instance), nr_samples, top)
-        return feature_importance_table(importances, features, values, errors)
+    [Input('selected-instance', 'children')])
+def update_importances(instance):
+    if instance:
+        top = 15
+        nr_samples=10
+        importances, features, values = retrieve_shap(int(instance), top)
+        return feature_importance_table_exact(importances, features, values)
     
 """
 RETRIEVE NEIGHBORS
