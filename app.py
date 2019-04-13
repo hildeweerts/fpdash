@@ -304,7 +304,19 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
     """
     Parameters
     ----------
+        x : array
+            mds x with x[0] alert and x[1:] neighbors
+        y : array
+            mds y, with y[0] being alert and y[1:] neighbors
+        neighbors : array
+            array with indexes of neighbors
         view : str, one from ['perf', 'pred']
+            which view to plot
+        instance : int
+            index of the current alert
+        border_width : int
+            border width 
+        
     """
     global spectral
     global cat_colors
@@ -595,11 +607,11 @@ app.layout = html.Div([
                                                       children = [dcc.Slider(
                                                           id='neighbors-slider',
                                                           min=10,
-                                                          max=100,
+                                                          max=50,
                                                           step=5,
                                                           value=20,                            
                                                           marks={str(n): {'label' : str(n), 
-                                                                          'style' : {'font-size' : 10}} for n in range(10,110,10)})])
+                                                                          'style' : {'font-size' : 10}} for n in range(10,60,10)})])
                                           ]),
                                  html.Div(className = 'row',
                                           id='view-div',
