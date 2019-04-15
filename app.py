@@ -326,11 +326,13 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
     if view == 'pred':
         showscale = False
         colorscale = [[0,'rgba(75, 75, 75, 1)'], [1, 'rgba(75, 75, 75, 1)']]
+        color_alert = 'rgba(255, 255, 0, 0.3)'
         showlegend = True
     elif view == 'perf':
         border_width = 0
         showscale = True
         colorscale = spectral
+        color_alert = spectral[int(meta_alert.iloc[instance]['score']*len(spectral))][1]
         showlegend = False
     else:
         raise ValueError("view must be one of ['pred', 'perf']")
@@ -371,9 +373,11 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
         x = [x[0]],
         y = [y[0]],
         mode = 'markers',
-        marker = {'line' : {'width' : 2, 'color' : 'rgba(50, 50, 50, 1)'},
+        marker = {'line' : {'width' : 3, 'color' : 'rgba(50, 50, 50, 1)'},
                   'size' : 14,
-                  'color' : 'rgba(255, 255, 0, 0.3)'},
+                  'color' : color_alert,
+                  'cmin' : 0,
+                  'cmax' : 1},
         name = 'Current alert',
         showlegend = True,
         hoverinfo = 'text',
@@ -428,17 +432,27 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
                      #  'width' : '170px'}
                     )
 
-def update_performance(fig, view, border_width=4):
-    global spectral
+def update_performance(fig, instance, view, border_width=4):
+    global spectral, meta_alert
     current_width = fig['data'][0]['marker']['line']['width']   
     if ((current_width == 0) and (view == 'perf')):
+        #alert
+        fig['data'][4]['marker']['color'] = 'rgba(255, 255, 0, 0.3)' 
+        #scale
+        fig['data'][4]['showlegend'] = True
         fig['data'][5]['marker']['showscale'] = False
+        #neighbors
         for i in range(4):
             fig['data'][i]['marker']['line']['width'] = border_width
             fig['data'][i]['marker']['colorscale'] = [[0,'rgba(75, 75, 75, 1)'], [1, 'rgba(75, 75, 75, 1)']]
             fig['data'][i]['showlegend'] = True
     elif ((current_width != 0) and (view == 'pred')):
+        #alert
+        fig['data'][4]['marker']['color'] = spectral[int(meta_alert.iloc[instance]['score']*len(spectral))][1]
+        #scale
+        fig['data'][4]['showlegend'] = True
         fig['data'][5]['marker']['showscale'] = True
+        #neighbors
         for i in range(4):
             fig['data'][i]['marker']['line']['width'] = 0
             fig['data'][i]['marker']['colorscale'] = spectral
@@ -757,12 +771,13 @@ def update_neighbors(neighbors, instance, n_clicks_space, n_clicks_perf):
 @app.callback(
     Output('neighbors-scatter', 'figure'),
     [Input('perf-button', 'n_clicks')],
-    [State('neighbors-scatter', 'figure')])
-def update_scatter(n_clicks, figure):
+    [State('neighbors-scatter', 'figure'), 
+     State('selected-instance', 'children')])
+def update_scatter(n_clicks, figure, instance):
     if (n_clicks is None) or (n_clicks % 2 == 0):
-        figure = update_performance(figure, view='pred')
+        figure = update_performance(figure, instance, view='pred')
     else:
-        figure = update_performance(figure, view='perf')
+        figure = update_performance(figure, instance, view='perf')
     return figure
 
 """
