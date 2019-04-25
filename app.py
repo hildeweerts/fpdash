@@ -594,23 +594,23 @@ app.layout = html.Div([
                      children = [html.H1('Case-Based Performance'),
                                  html.H2('Most Similar Cases'),
                                  html.P('Cases are retrieved based on how similar their explanation is to the current alert.'),
-                                html.Div(className = 'row',
-                                          children = [
-                                              html.H4(['Local Accuracy ', 
-                                                       html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
-                                                                 html.Span("""Local accuracy is the proportion of similar instances classified 
-                                                         correctly by the algorithm.""",
-                                                                           className='tooltiptext')], 
-                                                                className = "tooltip")
-                                                      ], id='accuracy'),
-                                              html.H4(['Local Precision ', 
-                                                       html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
-                                                                 html.Span("""Local precision is the proportion of similar instances classified as 
-                                                         positive by the classifier that were truly positive.""",
-                                                                           className='tooltiptext')], 
-                                                                className = "tooltip")
-                                                      ], id='precision')
-                                          ]),
+#                                 html.Div(className = 'row',
+#                                           children = [
+#                                               html.H4(['Local Accuracy ', 
+#                                                        html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
+#                                                                  html.Span("""Local accuracy is the proportion of similar instances classified 
+#                                                          correctly by the algorithm.""",
+#                                                                            className='tooltiptext')], 
+#                                                                 className = "tooltip")
+#                                                       ], id='accuracy'),
+#                                               html.H4(['Local Precision ', 
+#                                                        html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
+#                                                                  html.Span("""Local precision is the proportion of similar instances classified as 
+#                                                          positive by the classifier that were truly positive.""",
+#                                                                            className='tooltiptext')], 
+#                                                                 className = "tooltip")
+#                                                       ], id='precision')
+#                                           ]),
                                  html.Div(className='row',
                                           children = [
                                               html.H6('Number of Cases'),
@@ -806,31 +806,31 @@ def update_space_button(n_clicks):
 """
 update performance measures
 """
-@app.callback(
-    Output('accuracy', 'children'),
-    [Input('neighbor-dummydiv', 'children')],
-    [State('accuracy', 'children')])
-def update_accuracy(neighbors, children):
-    meta_neighbors = meta_base.iloc[neighbors]
-    acc = meta_neighbors['performance'].map({'TP' : 1, 'TN' : 1, 'FP' : 0, 'FN' : 0}).mean()
-    children[0] = 'Local Accuracy: %.2f ' % acc
-    return children
+# @app.callback(
+#     Output('accuracy', 'children'),
+#     [Input('neighbor-dummydiv', 'children')],
+#     [State('accuracy', 'children')])
+# def update_accuracy(neighbors, children):
+#     meta_neighbors = meta_base.iloc[neighbors]
+#     acc = meta_neighbors['performance'].map({'TP' : 1, 'TN' : 1, 'FP' : 0, 'FN' : 0}).mean()
+#     children[0] = 'Local Accuracy: %.2f ' % acc
+#     return children
 
-@app.callback(
-    Output('precision', 'children'),
-    [Input('neighbor-dummydiv', 'children')],
-    [State('precision', 'children')])
-def update_accuracy(neighbors, children):
-    meta_neighbors = meta_base.iloc[neighbors]
-    tp = len(meta_neighbors[meta_neighbors['performance'] == 'TP'])
-    fp = len(meta_neighbors[meta_neighbors['performance'] == 'FP'])
-    if (tp + fp) == 0:
-        text = 'Local Precision: NA '
-    else:
-        pre = tp/(tp + fp)
-        text = 'Local Precision: %.2f ' % pre
-    children[0] = text
-    return children
+# @app.callback(
+#     Output('precision', 'children'),
+#     [Input('neighbor-dummydiv', 'children')],
+#     [State('precision', 'children')])
+# def update_accuracy(neighbors, children):
+#     meta_neighbors = meta_base.iloc[neighbors]
+#     tp = len(meta_neighbors[meta_neighbors['performance'] == 'TP'])
+#     fp = len(meta_neighbors[meta_neighbors['performance'] == 'FP'])
+#     if (tp + fp) == 0:
+#         text = 'Local Precision: NA '
+#     else:
+#         pre = tp/(tp + fp)
+#         text = 'Local Precision: %.2f ' % pre
+#     children[0] = text
+#     return children
 
 if __name__ == '__main__':
     app.run_server(debug=True, processes=4)
