@@ -332,7 +332,7 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
         border_width = 0
         showscale = True
         colorscale = spectral
-        color_alert = spectral[int(meta_alert.iloc[instance]['score']*len(spectral))][1]
+        color_alert = spectral[int(meta_alert.iloc[instance]['score']*len(spectral))-1][1]
         showlegend = False
     else:
         raise ValueError("view must be one of ['pred', 'perf']")
@@ -434,7 +434,7 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
 
 def update_performance(fig, instance, view, border_width=4):
     global spectral, meta_alert
-    current_width = fig['data'][0]['marker']['line']['width']   
+    current_width = fig['data'][0]['marker']['line']['width']
     if ((current_width == 0) and (view == 'perf')):
         #alert
         fig['data'][4]['marker']['color'] = 'rgba(255, 255, 0, 0.3)' 
@@ -448,7 +448,7 @@ def update_performance(fig, instance, view, border_width=4):
             fig['data'][i]['showlegend'] = True
     elif ((current_width != 0) and (view == 'pred')):
         #alert
-        fig['data'][4]['marker']['color'] = spectral[int(meta_alert.iloc[instance]['score']*len(spectral))][1]
+        fig['data'][4]['marker']['color'] = spectral[int(meta_alert.iloc[instance]['score']*len(spectral))-1][1]
         #scale
         fig['data'][4]['showlegend'] = True
         fig['data'][5]['marker']['showscale'] = True
@@ -529,8 +529,8 @@ app.layout = html.Div([
                                  # Title
                                  html.H2('Prediction'),
                                  # Subtitle
-                                 html.P("""The prediction probability indicates the 
-                                           likelihood of the positive class, as estimated by the classifier. """),
+                                 html.P("""The model's confidence indicates the 
+                                           likelihood of the positive class, as estimated by the model. """),
                                  html.H4(id = 'load-probability'),
                                  html.H4(id = 'prediction-probability')
                              ]),
@@ -593,7 +593,7 @@ app.layout = html.Div([
                      style = columnStyle,
                      children = [html.H1('Case-Based Performance'),
                                  html.H2('Most Similar Cases'),
-                                 html.P('Cases are retrieved based on how similar their explanation is to the current alert.'),
+                                 html.P('The cases most similar to the alert are retrieved.'),
 #                                 html.Div(className = 'row',
 #                                           children = [
 #                                               html.H4(['Local Accuracy ', 
@@ -689,10 +689,10 @@ def update_probability(instance):
 def update_probability(instance):
     if instance:
         probability = clf.predict_proba([X_alert.iloc[instance]])[0][1]
-        return ['Prediction Probability: %.2f ' % probability,
+        return ["Model's confidence: %.2f " % probability,
                 html.Div([html.I(className="fas fa-exclamation-circle", style=iconStyle),
                           html.Span([html.B("""WARNING: """),
-                                       """the classifier's prediction might be inaccurate!"""],
+                                       """the model's confidence might be inaccurate!"""],
                                      className='tooltiptext')],
                           className = "tooltip")]
     
