@@ -228,12 +228,12 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
     global meta_base
     global meta_alert
     
-    if view == 'pred':
+    if view == 'perf':
         showscale = False
         colorscale = [[0,'rgba(75, 75, 75, 1)'], [1, 'rgba(75, 75, 75, 1)']]
         color_alert = 'rgba(255, 255, 0, 0.3)'
         showlegend = True
-    elif view == 'perf':
+    elif view == 'pred':
         border_width = 0
         showscale = True
         colorscale = spectral
@@ -489,16 +489,33 @@ app.layout = html.Div([
                                                           marks={str(n): {'label' : str(n), 
                                                                           'style' : {'font-size' : 10}} for n in range(10,110,10)})])
                                           ]),
+                                 html.Div(className='row',
+                                          children = [
+                                              html.H6('View', style={'marginTop' : '2rem'}),
+                                          ]),
                                  html.Div(className = 'row',
-                                          id='view-div',
-                                          children = [html.Button('View Performance', 
-                                                                  id='perf-button',
-                                                                  style = {'marginTop' : '2.5rem',
-                                                                           'marginRight' : '0.5rem'}),
-                                                      html.Button('View in Explanation Space',
-                                                                  id='space-button',
-                                                                  style = {'marginTop' : '2.5rem'})]
-                                         ),
+                                          id='perf-buttons',
+                                          children = [html.Button('Performance', 
+                                                                  id ='color-button-perf',
+                                                                  style = {'marginRight' : '0.5rem',
+                                                                           'background-color' : 'transparent', 
+                                                                           'color' : '#555'}),
+                                                      html.Button('Predictions', 
+                                                                  id ='color-button-pred',
+                                                                  style = {'marginRight' : '0.5rem'})]),
+                                 html.Div(className='row',
+                                          children = [
+                                              html.H6('Similarity'),
+                                          ]),
+                                 html.Div(className = 'row',
+                                          id='space-buttons',
+                                          children = [html.Button('Feature Values', 
+                                                                  id ='space-button-val',
+                                                                  style = {'marginRight' : '0.5rem'}),
+                                                      html.Button('Feature Contributions', 
+                                                                  id ='space-button-contr',
+                                                                  style = {'marginRight' : '0.5rem'})]),
+
                                  html.Div(className ='row',
                                           children = [
                                               html.Div(id='neighbors-plot', style= {'marginTop' : '1.5rem', 'marginBottom' : '1.5rem'})
@@ -506,7 +523,9 @@ app.layout = html.Div([
                                 ]),
             # HIDDEN DIVS WITH INTERMEDIATE VALUES
             html.Div(id='selected-instance', style={'display': 'none'}, children=0),
-            html.Div(id='neighbor-dummydiv', style={'display': 'none'}, children=None)
+            html.Div(id='neighbor-dummydiv', style={'display': 'none'}, children=None),
+            html.Div(id='color-state', children='perf:0 pred:0 last:pred', style={'display': 'none'}),
+            html.Div(id='space-state', children='val:0 contr:0 last:val', style={'display': 'none'}),
                       ])
 ], style={'paddingTop' : 5})
 
@@ -591,60 +610,148 @@ def update_dummy_div(n_neighbors, instance):
 """
 scatterplot
 """
+
+@app.callback(
+    Output('color-state', 'children'), 
+    [Input('color-button-perf', 'n_clicks'),
+     Input('color-button-pred', 'n_clicks')],
+    [State('color-state', 'children')])
+def update_state(perf_clicks, pred_clicks, prev_clicks):
+    prev_clicks = dict([i.split(':') for i in prev_clicks.split(' ')])
+    
+    # Replace None by 0
+    if perf_clicks is None:
+        perf_clicks = 0
+    if pred_clicks is None:
+        pred_clicks = 0
+    # Check value
+    if perf_clicks > int(prev_clicks['perf']):
+        last_clicked = 'perf'
+    elif pred_clicks > int(prev_clicks['pred']):
+        last_clicked = 'pred'
+    else:
+        last_clicked ='pred'
+    # Check changed
+    prev_clicked = prev_clicks['last']
+    if prev_clicked == last_clicked:
+        changed = 'no'
+    else:
+        changed = 'yes'
+    # Update current state
+    cur_clicks = 'perf:{} pred:{} last:{} changed:{}'.format(perf_clicks, pred_clicks, last_clicked, changed)
+    return cur_clicks
+
+@app.callback(
+    Output('space-state', 'children'), 
+    [Input('space-button-val', 'n_clicks'),
+     Input('space-button-contr', 'n_clicks')],
+    [State('space-state', 'children')])
+def update_state(val_clicks, contr_clicks, prev_clicks):
+    prev_clicks = dict([i.split(':') for i in prev_clicks.split(' ')])
+    # Replace None by 0
+    if val_clicks is None:
+        val_clicks = 0
+    if contr_clicks is None:
+        contr_clicks = 0
+    # Check value
+    if val_clicks > int(prev_clicks['val']):
+        last_clicked = 'feature'
+    elif contr_clicks > int(prev_clicks['contr']):
+        last_clicked = 'shap'
+    else:
+        last_clicked ='feature'
+    # Check changed
+    prev_clicked = prev_clicks['last']
+    if prev_clicked == last_clicked:
+        changed = 'no'
+    else:
+        changed = 'yes'
+    cur_clicks = 'val:{} contr:{} last:{} changed:{}'.format(val_clicks, contr_clicks, last_clicked, changed)
+    return cur_clicks
+
 @app.callback(
     Output('neighbors-plot', 'children'),
     [Input('neighbor-dummydiv', 'children'),
      Input('selected-instance', 'children'),
-     Input('space-button', 'n_clicks')],
-    [State('perf-button', 'n_clicks')])
-def update_neighbors(neighbors, instance, n_clicks_space, n_clicks_perf):
+     Input('space-state', 'children')],
+    [State('color-state', 'children'),
+     State('neighbors-plot', 'children')])
+def update_neighbors(neighbors, instance, prev_clicks_space, prev_clicks_color, current_graph):
     global meta_base
-    if (n_clicks_space is None) or (n_clicks_space % 2 ==0):
-        space = 'feature'
+    prev_clicks_space = dict([i.split(':') for i in prev_clicks_space.split(' ')])
+    # Check whether it has changed
+    if prev_clicks_space['changed'] == 'no':
+        graph = current_graph
     else:
-        space = 'shap'
-    # compute graph
-    x, y = compute_mds(instance, neighbors, space=space)
-    if (n_clicks_perf is None) or (n_clicks_perf % 2 == 0):
-        graph = scatter_neighbors(x, y, neighbors, view='perf', instance=instance)
-    else:
-        graph = scatter_neighbors(x, y, neighbors, view='pred', instance=instance)
+        # Determine space
+        last_clicked_space = prev_clicks_space['last']
+        # compute distances
+        x, y = compute_mds(instance, neighbors, space=last_clicked_space)
+        # Determine color
+        last_clicked_color = dict([i.split(':') for i in prev_clicks_color.split(' ')])['last']
+        # create graph
+        graph = scatter_neighbors(x, y, neighbors, view=last_clicked_color, instance=instance)
     return graph
 
 @app.callback(
     Output('neighbors-scatter', 'figure'),
-    [Input('perf-button', 'n_clicks')],
+    [Input('color-state', 'children')],
     [State('neighbors-scatter', 'figure'), 
      State('selected-instance', 'children')])
-def update_scatter(n_clicks, figure, instance):
-    if (n_clicks is None) or (n_clicks % 2 == 0):
-        figure = update_performance(figure, instance, view='pred')
+def update_scatter(prev_clicks_color, figure, instance):
+    prev_clicks_color = dict([i.split(':') for i in prev_clicks_color.split(' ')])
+    if prev_clicks_color['changed'] == 'no':
+        figure = figure
     else:
-        figure = update_performance(figure, instance, view='perf')
+        last_clicked_color = prev_clicks_color['last']
+        print(last_clicked_color)
+        figure = update_performance(figure, instance, view=last_clicked_color)
     return figure
+
 
 """
 update buttons
 """
-@app.callback(
-    Output('perf-button', 'children'),
-    [Input('perf-button', 'n_clicks')])
-def update_perf_button(n_clicks):
-    if (n_clicks is None) or (n_clicks % 2 == 0):
-        children = 'View Performance'
-    else:
-        children = 'View Predictions'
-    return children
 
 @app.callback(
-    Output('space-button', 'children'),
-    [Input('space-button', 'n_clicks')])
-def update_space_button(n_clicks):
-    if (n_clicks is None) or (n_clicks % 2 == 0):
-        children = 'View in explanation space'
-    else:
-        children = 'View in feature space'
-    return children
+    Output('color-button-perf', 'style'),
+    [Input('color-state', 'children')],
+    [State('color-button-perf', 'style')])
+def update_perf_button(prev_clicks_color, current_style):
+    prev_clicks_color = dict([i.split(':') for i in prev_clicks_color.split(' ')])
+    new_background = current_style['background-color']
+    new_color = current_style['color']
+    if prev_clicks_color['changed'] == 'yes':
+        if prev_clicks_color['last'] == 'perf':
+            new_background = '#888'
+            new_color = '#fff'
+        elif prev_clicks_color['last'] == 'pred':
+            new_background = 'transparent'
+            new_color = '#555'
+    current_style['background-color'] = new_background
+    current_style['color'] = new_color
+    return current_style
+
+
+# @app.callback(
+#     Output('perf-button', 'children'),
+#     [Input('perf-button', 'n_clicks')])
+# def update_perf_button(n_clicks):
+#     if (n_clicks is None) or (n_clicks % 2 == 0):
+#         children = 'View Performance'
+#     else:
+#         children = 'View Predictions'
+#     return children
+
+# @app.callback(
+#     Output('space-button', 'children'),
+#     [Input('space-button', 'n_clicks')])
+# def update_space_button(n_clicks):
+#     if (n_clicks is None) or (n_clicks % 2 == 0):
+#         children = 'View in explanation space'
+#     else:
+#         children = 'View in feature space'
+#     return children
 
 if __name__ == '__main__':
     app.run_server(debug=True, processes=4)
