@@ -15,7 +15,7 @@ from matplotlib import cm
 from scipy import stats
 # sklearn
 from sklearn.manifold import MDS
-
+from sklearn.neighbors import NearestNeighbors
 # add to pythonpath
 sys.path.append(os.getcwd() + '/fpdash')
 import shapley.shap as shap
@@ -28,8 +28,8 @@ INITIALIZE GLOBAL STUFF
 with open(os.getcwd() + '/data/clf.pickle', 'rb') as f:
     clf = pickle.load(f)
 # Import NN
-with open(os.getcwd() + '/data/nn.pickle', 'rb') as f:
-    nn = pickle.load(f)
+# with open(os.getcwd() + '/data/nn.pickle', 'rb') as f:
+#     nn = pickle.load(f)
 
 # load case base data
 X_base = pd.read_csv(os.getcwd() + '/data/X_base.csv')
@@ -70,6 +70,43 @@ cat_colors = {'TP' : 'rgba(159, 211, 86, %s)' % opacity,
              'FP' : 'rgba(177, 15, 46, %s)' % opacity,
              'FN' : 'rgba(255, 165, 76, %s)' % opacity}
 
+# Train nearest neighbors
+def define_distance_function(contr):
+    """
+    Parameters
+    ----------
+    contr : array like
+        shap values of instance
+        
+    Returns
+    -------
+    weighted_distance : function
+        function that computes the distance weighted by feature contributions
+    """
+    contr = np.abs(np.array(contr))
+    def weighted_distance(a, b):
+        """ compute Euclidean distance between a and b, weighted by feature contributions
+        Parameters
+        ---------
+        a : array
+        b : array
+
+        Returns
+        -------
+        distance : float
+            weighted distance between array a and b
+        """
+        distance = np.sqrt(np.sum(contr * np.square(np.array(a) - np.array(b))))
+        return distance
+    return weighted_distance
+nn_dict = {}
+for i in range(len(SHAP_alert)):
+    distance_function_i = define_distance_function(SHAP_alert.iloc[i])
+    nn_i = NearestNeighbors(n_neighbors = 10, algorithm = 'brute', metric = distance_function_i)
+    nn_i.fit(SHAP_base)
+    nn_dict[i] = nn_i
+print('Initialized nearest neighbor.')
+
 """
 COMPUTE SHAP WITH SAMPLES
 """
@@ -96,7 +133,7 @@ def retrieve_neighbors(i, n_neighbors = 10):
     if n_neighbors == 0:
         distances, neighbors = [None], [None]
     else:
-        distances, neighbors = nn.kneighbors(SHAP_alert.iloc[[i]], n_neighbors=n_neighbors)
+        distances, neighbors = nn_dict[i].kneighbors(SHAP_alert.iloc[[i]], n_neighbors=n_neighbors)
     return distances[0], neighbors[0]
 
 def compute_mds(i, neighbors, space):
@@ -271,7 +308,7 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
             name=perf,
             hoverinfo = 'text',
             hoveron = 'points',
-            text = ['p=%.2f' % i for i in group['score']])
+            text = ['%.2f' % i for i in group['score']])
         traces.append(scatter)
     #Add alert
     traces.append(go.Scatter(
@@ -492,14 +529,14 @@ app.layout = html.Div([
                                  html.Div(className='row',
                                           children = [html.H6(['View ',
                                                                html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
-                                                                         html.Span(["""Display the model's prediction or the model's performance."""],
+                                                                         html.Span(["""Display the model's confidence scores or the model's performance."""],
                                                                                    className='tooltiptext')],
                                                                         className = "tooltip")
                                                               ])
                                                      ], style = {'marginTop' : '3.5rem'}),
                                  html.Div(className = 'row',
                                           id='perf-buttons',
-                                          children = [html.Button('Predictions', 
+                                          children = [html.Button("Confidence", 
                                                                   id ='color-button-pred',
                                                                   style = {'marginRight' : '0.5rem',
                                                                            'background-color' : '#888', 
@@ -535,7 +572,10 @@ app.layout = html.Div([
                                  html.Div(className ='row',
                                           children = [
                                               html.Div(id='neighbors-plot', style= {'marginTop' : '1.5rem', 'marginBottom' : '1.5rem'})
-                                          ])
+                                          ]),
+                                 html.Div(id = 'performance-explanation',
+                                          className = 'row',
+                                          children = [''])
                                 ]),
             # HIDDEN DIVS WITH INTERMEDIATE VALUES
             html.Div(id='selected-instance', style={'display': 'none'}, children=0),
@@ -804,7 +844,33 @@ def update_val_button(prev_clicks_space, current_style):
     current_style['color'] = new_color
     return current_style
 
-
+"""
+display performance explanation
+"""
+@app.callback(
+    Output('performance-explanation', 'children'),
+    [Input('color-state', 'children')])
+def update_performance_explanation(prev_clicks_color):
+    prev_clicks_color = dict([i.split(':') for i in prev_clicks_color.split(' ')])
+    text = ''
+    if prev_clicks_color['changed'] == 'yes':
+        if prev_clicks_color['last'] == 'perf':
+            text = html.Ul([html.Li(html.P([html.B('TP '),
+                                            '(true positive): triggered an alert and was indeed fraudulent.']
+                                          )),
+                            html.Li(html.P([html.B('FP '), 
+                                '(false postive): triggered alert but was', html.B(' not '), 'fraudulent.']
+                                          )),
+                            html.Li(html.P([html.B('TN '),
+                                            '(true negative): did not trigger an alert and was indeed non-fraudulent.']
+                                          )),
+                            html.Li(html.P([html.B('FN '), 
+                                            '(false negative): did not trigger an alert but was actually fraudulent.']
+                                          ))
+                           ])
+        elif prev_clicks_color['last'] == 'pred':
+            text = ''
+    return text
 
 if __name__ == '__main__':
     app.run_server(debug=True, processes=4)
