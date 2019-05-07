@@ -732,27 +732,6 @@ def update_perf_button(prev_clicks_color, current_style):
     current_style['color'] = new_color
     return current_style
 
-
-# @app.callback(
-#     Output('perf-button', 'children'),
-#     [Input('perf-button', 'n_clicks')])
-# def update_perf_button(n_clicks):
-#     if (n_clicks is None) or (n_clicks % 2 == 0):
-#         children = 'View Performance'
-#     else:
-#         children = 'View Predictions'
-#     return children
-
-# @app.callback(
-#     Output('space-button', 'children'),
-#     [Input('space-button', 'n_clicks')])
-# def update_space_button(n_clicks):
-#     if (n_clicks is None) or (n_clicks % 2 == 0):
-#         children = 'View in explanation space'
-#     else:
-#         children = 'View in feature space'
-#     return children
-
 if __name__ == '__main__':
     app.run_server(debug=True, processes=4)
     
