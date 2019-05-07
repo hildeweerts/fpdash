@@ -6,10 +6,10 @@
 
 .tooltip .tooltiptext {
   visibility: hidden;
-  width: 150px;
-  background-color: #505050;
-  color: #e5e5e5;
-  font-size: 1rem;
+  width: 250px;
+  background-color: #555;
+  color: #fff;
+  font-size: 1.1rem;
   font-weight: 300;
   text-align: center;
   padding: 5px 10px;
@@ -30,7 +30,7 @@
   right: 100%;
   border-width: 5px;
   border-style: solid;
-  border-color: transparent #505050 transparent transparent;
+  border-color: transparent #555 transparent transparent;
 }
 
 .tooltip:hover .tooltiptext {

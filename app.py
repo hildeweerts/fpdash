@@ -298,7 +298,7 @@ def scatter_neighbors(x, y, neighbors, view, instance, border_width=4):
             showscale=showscale,
             cmin=0,
             cmax=1,
-            colorbar=dict(thickness=5, ticklen=8, outlinewidth=0, title="""Prediction""", tickfont = {'size' : 8}, titlefont={'size' : 10})),
+            colorbar=dict(thickness=5, ticklen=8, outlinewidth=0, title="""Model's Confidence""", tickfont = {'size' : 8}, titlefont={'size' : 10})),
         showlegend = False,
         hoverinfo='none'))
 
@@ -472,7 +472,7 @@ app.layout = html.Div([
                      style = columnStyle,
                      children = [html.H1('Case-Based Performance'),
                                  html.H2('Most Similar Cases'),
-                                 html.P('The cases most similar to the alert are retrieved.'),
+                                 #html.P('The cases most similar to the alert are retrieved.'),
                                  html.Div(className='row',
                                           children = [
                                               html.H6('Number of Cases'),
@@ -485,36 +485,52 @@ app.layout = html.Div([
                                                           min=10,
                                                           max=100,
                                                           step=5,
-                                                          value=20,                            
+                                                          value=30,                            
                                                           marks={str(n): {'label' : str(n), 
                                                                           'style' : {'font-size' : 10}} for n in range(10,110,10)})])
                                           ]),
                                  html.Div(className='row',
-                                          children = [
-                                              html.H6('View', style={'marginTop' : '2rem'}),
-                                          ]),
+                                          children = [html.H6(['View ',
+                                                               html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
+                                                                         html.Span(["""Display the model's prediction or the model's performance."""],
+                                                                                   className='tooltiptext')],
+                                                                        className = "tooltip")
+                                                              ])
+                                                     ], style = {'marginTop' : '3.5rem'}),
                                  html.Div(className = 'row',
                                           id='perf-buttons',
-                                          children = [html.Button('Performance', 
+                                          children = [html.Button('Predictions', 
+                                                                  id ='color-button-pred',
+                                                                  style = {'marginRight' : '0.5rem',
+                                                                           'background-color' : '#888', 
+                                                                           'color' : '#fff'}),
+                                                      html.Button('Performance', 
                                                                   id ='color-button-perf',
                                                                   style = {'marginRight' : '0.5rem',
                                                                            'background-color' : 'transparent', 
-                                                                           'color' : '#555'}),
-                                                      html.Button('Predictions', 
-                                                                  id ='color-button-pred',
-                                                                  style = {'marginRight' : '0.5rem'})]),
+                                                                           'color' : '#555'})]),
                                  html.Div(className='row',
-                                          children = [
-                                              html.H6('Similarity'),
-                                          ]),
+                                          children = [html.H6(['Similarity ',
+                                                               html.Div([html.I(className="fas fa-info-circle", style=iconStyle),
+                                                                         html.Span(["""Display similarity on feature values (= similar attributes) 
+                                                                         or feature contributions (= similar explanation)"""],
+                                                                                   className='tooltiptext')],
+                                                                        className = "tooltip")
+                                                              ])
+                                                     ],
+                                          style = {'marginTop' : '2rem' }),
                                  html.Div(className = 'row',
                                           id='space-buttons',
                                           children = [html.Button('Feature Values', 
                                                                   id ='space-button-val',
-                                                                  style = {'marginRight' : '0.5rem'}),
+                                                                  style = {'marginRight' : '0.5rem', 
+                                                                           'background-color' : '#888', 
+                                                                           'color' : '#fff'}),
                                                       html.Button('Feature Contributions', 
                                                                   id ='space-button-contr',
-                                                                  style = {'marginRight' : '0.5rem'})]),
+                                                                  style = {'marginRight' : '0.5rem', 
+                                                                           'background-color' : 'transparent', 
+                                                                           'color' : '#555'})]),
 
                                  html.Div(className ='row',
                                           children = [
@@ -704,7 +720,6 @@ def update_scatter(prev_clicks_color, figure, instance):
         figure = figure
     else:
         last_clicked_color = prev_clicks_color['last']
-        print(last_clicked_color)
         figure = update_performance(figure, instance, view=last_clicked_color)
     return figure
 
@@ -731,6 +746,65 @@ def update_perf_button(prev_clicks_color, current_style):
     current_style['background-color'] = new_background
     current_style['color'] = new_color
     return current_style
+
+@app.callback(
+    Output('color-button-pred', 'style'),
+    [Input('color-state', 'children')],
+    [State('color-button-pred', 'style')])
+def update_pred_button(prev_clicks_color, current_style):
+    prev_clicks_color = dict([i.split(':') for i in prev_clicks_color.split(' ')])
+    new_background = current_style['background-color']
+    new_color = current_style['color']
+    if prev_clicks_color['changed'] == 'yes':
+        if prev_clicks_color['last'] == 'pred':
+            new_background = '#888'
+            new_color = '#fff'
+        elif prev_clicks_color['last'] == 'perf':
+            new_background = 'transparent'
+            new_color = '#555'
+    current_style['background-color'] = new_background
+    current_style['color'] = new_color
+    return current_style
+
+@app.callback(
+    Output('space-button-val', 'style'),
+    [Input('space-state', 'children')],
+    [State('space-button-val', 'style')])
+def update_val_button(prev_clicks_space, current_style):
+    prev_clicks_space = dict([i.split(':') for i in prev_clicks_space.split(' ')])
+    new_background = current_style['background-color']
+    new_color = current_style['color']
+    if prev_clicks_space['changed'] == 'yes':
+        if prev_clicks_space['last'] == 'feature':
+            new_background = '#888'
+            new_color = '#fff'
+        elif prev_clicks_space['last'] == 'shap':
+            new_background = 'transparent'
+            new_color = '#555'
+    current_style['background-color'] = new_background
+    current_style['color'] = new_color
+    return current_style
+
+@app.callback(
+    Output('space-button-contr', 'style'),
+    [Input('space-state', 'children')],
+    [State('space-button-contr', 'style')])
+def update_val_button(prev_clicks_space, current_style):
+    prev_clicks_space = dict([i.split(':') for i in prev_clicks_space.split(' ')])
+    new_background = current_style['background-color']
+    new_color = current_style['color']
+    if prev_clicks_space['changed'] == 'yes':
+        if prev_clicks_space['last'] == 'shap':
+            new_background = '#888'
+            new_color = '#fff'
+        elif prev_clicks_space['last'] == 'feature':
+            new_background = 'transparent'
+            new_color = '#555'
+    current_style['background-color'] = new_background
+    current_style['color'] = new_color
+    return current_style
+
+
 
 if __name__ == '__main__':
     app.run_server(debug=True, processes=4)
